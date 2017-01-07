@@ -10,3 +10,5 @@ backup/**/*
 Thumbs.db
 .irb_history
 *.wav
+/.bundle/
+*.lock
