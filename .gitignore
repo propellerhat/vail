@@ -1,0 +1,12 @@
+.DS_Store*
+.zcompdump
+.zsh_history
+.viminfo
+*~
+*.swp
+backup/**/*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+.irb_history
+*.wav
