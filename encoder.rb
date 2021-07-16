@@ -4,23 +4,26 @@ class Encoder
 
   SAMPLE_RATE = 44100
   
-  attr_accessor :character_wpm, :farnsworth_spacing
-  attr_accessor :freq, :SAMPLE_RATE, :samples, :cursor_step
+  attr_accessor :character_wpm
+  attr_accessor :freq, :samples, :cursor_step
   attr_accessor :samples_per_dit, :seconds_per_dit
   attr_accessor :char_map
 
-  def initialize(character_wpm = 25, farnsworth_spacing = nil, freq = 600.0)
+  def initialize(character_wpm: 25, farnsworth_spacing: 0, freq: 600.0)
     @character_wpm = character_wpm
-    #if farnsworth_spacing.nil? { farnsworth_spacing = @character_wpm }
-    #if farnsworth_spacing > character_wpm { farnsworth_spacing = @character_wpm }
     @farnsworth_spacing = farnsworth_spacing
     @freq = freq
 
     @seconds_per_dit = 60.0 / (@character_wpm * 50)
     @samples_per_dit = (SAMPLE_RATE * @seconds_per_dit).round
     
-    @farnsworth_seconds_per_dit = 60.0 / (@farnsworth_spacing * 50)
-    @farnsworth_samples_per_dit = (SAMPLE_RATE * @farnsworth_seconds_per_dit).round
+    if farnsworth_spacing.zero?
+      @farnsworth_samples_per_dit = 0
+    else
+      farnsworth_seconds_per_dit = 60.0 / (farnsworth_spacing * 50)
+      @farnsworth_samples_per_dit = (SAMPLE_RATE *
+                                     farnsworth_seconds_per_dit).round
+    end
 
     @cursor_step = @freq / SAMPLE_RATE
     @samples = []
@@ -114,12 +117,15 @@ class Encoder
     # 2 more to get the regulation 3.
     generate_silence (@samples_per_dit * 2)
 
-    # We also need to add the farnsworth adjustment to the silence.
-    # First, figure out the farnsworth inter-character space:
-    farnsworth_additional_silence =  @farnsworth_samples_per_dit * 3
-    # Then, subtract the existing silence
-    farnsworth_additional_silence -= @samples_per_dit * 3
-    generate_silence farnsworth_additional_silence
+    if @farnsworth_spacing.positive?
+      # We also need to add the farnsworth adjustment to the silence.
+      # First, figure out the farnsworth inter-character space:
+      farnsworth_additional_silence =  @farnsworth_samples_per_dit * 3
+      # Then, subtract the existing silence
+      farnsworth_additional_silence -= @samples_per_dit * 3
+      generate_silence farnsworth_additional_silence
+    end
+
   end
 
   def generate_silence(num_samples)
@@ -165,7 +171,11 @@ class Encoder
         # The way in which characters are encoded, there will already
         # be 3 dits of silence on the end of the character. We need only
         # add 4 more to get the regulation 7 dits to separate words.
-        generate_silence(@farnsworth_samples_per_dit * 4)
+        if farnsworth_spacing.positive?
+          generate_silence(@farnsworth_samples_per_dit * 4)
+        else
+          generate_silence(@samples_per_dit * 4)
+        end
       elsif '<' == c
         # This is the start of a prosign. We must consume and encode the
         # prosign.
@@ -176,12 +186,12 @@ class Encoder
     end
   end
 
-  def write_out_wavefile
+  def write_out_wavefile(wave_filename)
     buffer_format = WaveFile::Format.new(:mono, :float, SAMPLE_RATE)
     buffer = WaveFile::Buffer.new(@samples, buffer_format)
     
     file_format = WaveFile::Format.new(:mono, :pcm_16, SAMPLE_RATE)
-    WaveFile::Writer.new("morse.wav", file_format) do |writer|
+    WaveFile::Writer.new(wave_filename, file_format) do |writer|
       writer.write(buffer)
     end
   end
